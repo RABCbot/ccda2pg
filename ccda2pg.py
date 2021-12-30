@@ -2,17 +2,22 @@ import sys
 import psycopg2
 import xml.etree.ElementTree as ET
 
+DEBUG = False
 SQL_CMD = "insert into labresults(date, patient, name, value, unit, range) Values (%s, %s, %s, %s, %s, %s)"
 
 conn = psycopg2.connect(
-    host="your-host",
+    host="192.168.101.103",
     database="health-vault",
-    user="your-user",
-    password="your-password")
+    user="admin",
+    password="2putipus")
 
+# Arguments
+# 1 - CCDA xml file
+# 2 - Date for results
 tree = ET.parse(sys.argv[1])
 report_date = sys.argv[2]
 
+# patient name
 root = tree.getroot()
 data = root.find("./{urn:hl7-org:v3}recordTarget/{urn:hl7-org:v3}patientRole/{urn:hl7-org:v3}patient/{urn:hl7-org:v3}name")
 family = data.find("{urn:hl7-org:v3}family")
@@ -20,7 +25,9 @@ given = data.find("{urn:hl7-org:v3}given")
 patient = f"{given.text} {family.text}"
 print(patient)
 
+# Lab results 2.16.840.1.113883.10.20.22.2.3.1
 for section in root.findall("./{urn:hl7-org:v3}component/{urn:hl7-org:v3}structuredBody/{urn:hl7-org:v3}component/{urn:hl7-org:v3}section/{urn:hl7-org:v3}templateId[@root='2.16.840.1.113883.10.20.22.2.3.1']/.."):
+  ## for rec in section.findall("{urn:hl7-org:v3}text/{urn:hl7-org:v3}list/{urn:hl7-org:v3}item/{urn:hl7-org:v3}table/{urn:hl7-org:v3}thead/{urn:hl7-org:v3}tr"):
   for rec in section.findall("{urn:hl7-org:v3}text/{urn:hl7-org:v3}table/{urn:hl7-org:v3}thead/{urn:hl7-org:v3}tr"):
     data = rec.findall("{urn:hl7-org:v3}th")
     idx = 0
@@ -36,6 +43,7 @@ for section in root.findall("./{urn:hl7-org:v3}component/{urn:hl7-org:v3}structu
       if "result" in d.text.lower(): value_idx = idx
       idx =  idx + 1
 
+  ## for rec in section.findall("{urn:hl7-org:v3}text/{urn:hl7-org:v3}list/{urn:hl7-org:v3}item/{urn:hl7-org:v3}table/{urn:hl7-org:v3}tbody/{urn:hl7-org:v3}tr"):
   for rec in section.findall("{urn:hl7-org:v3}text/{urn:hl7-org:v3}table/{urn:hl7-org:v3}tbody/{urn:hl7-org:v3}tr"):
     data = rec.findall("{urn:hl7-org:v3}td")
     name = data[name_idx].text if name_idx != None and len(data) > name_idx else ""
@@ -50,6 +58,26 @@ for section in root.findall("./{urn:hl7-org:v3}component/{urn:hl7-org:v3}structu
 
     if name and value:
       print(f"{name}, {value}, {unit}, {range}")
+      if not DEBUG:
+        try:
+          cur = conn.cursor()
+          cur.execute(SQL_CMD, (report_date, patient, name, float(value), unit, range))
+          conn.commit()
+        except (Exception, psycopg2.DatabaseError) as error:
+          print(error)
+          conn.rollback()
+        finally:
+          cur.close()
+
+# Vitals
+for section in root.findall("./{urn:hl7-org:v3}component/{urn:hl7-org:v3}structuredBody/{urn:hl7-org:v3}component/{urn:hl7-org:v3}section/{urn:hl7-org:v3}templateId[@root='2.16.840.1.113883.10.20.22.2.4.1']/.."):
+  for rec in section.findall("{urn:hl7-org:v3}text/{urn:hl7-org:v3}table/{urn:hl7-org:v3}tbody/{urn:hl7-org:v3}tr"):
+    data = rec.find("{urn:hl7-org:v3}th")
+    name = data.text.upper()
+    data = rec.find("{urn:hl7-org:v3}td")
+    value, _, unit = data.text.partition(" ")
+    print(f"{name}, {value}, {unit}")
+    if not DEBUG:
       try:
         cur = conn.cursor()
         cur.execute(SQL_CMD, (report_date, patient, name, float(value), unit, range))
