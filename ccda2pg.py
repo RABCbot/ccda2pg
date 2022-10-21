@@ -6,10 +6,10 @@ DEBUG = False
 SQL_CMD = "insert into labresults(date, patient, name, value, unit, range) Values (%s, %s, %s, %s, %s, %s)"
 
 conn = psycopg2.connect(
-    host="192.168.101.103",
+    host="your-ip",
     database="health-vault",
-    user="admin",
-    password="2putipus")
+    user="your-user",
+    password="your-password")
 
 # Arguments
 # 1 - CCDA xml file
