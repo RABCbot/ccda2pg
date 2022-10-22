@@ -6,10 +6,10 @@ DEBUG = False
 SQL_CMD = "insert into labresults(date, patient, name, value, unit, range) Values (%s, %s, %s, %s, %s, %s)"
 
 conn = psycopg2.connect(
-    host="your-ip",
-    database="health-vault",
-    user="your-user",
-    password="your-password")
+    host="postgres-ip",
+    database="postgres-database",
+    user="postgres-user",
+    password="postgres-password")
 
 # Arguments
 # 1 - CCDA xml file
@@ -49,6 +49,8 @@ for section in root.findall("./{urn:hl7-org:v3}component/{urn:hl7-org:v3}structu
     name = data[name_idx].text if name_idx != None and len(data) > name_idx else ""
     if name: name = name.upper()
     value = data[value_idx].text if value_idx != None and len(data) > value_idx  else ""
+    value = value.split(' ', 1)[0]
+    print(value)
     try:
       value = float(value)
     except (TypeError, ValueError):
